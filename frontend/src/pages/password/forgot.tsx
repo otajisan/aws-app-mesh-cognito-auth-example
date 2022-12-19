@@ -7,9 +7,6 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import CssBaseline from '@mui/material/CssBaseline';
 import TextField from '@mui/material/TextField';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Checkbox from '@mui/material/Checkbox';
-import Link from '@mui/material/Link';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
@@ -18,17 +15,16 @@ import Container from '@mui/material/Container';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 import { Alert } from '@mui/material';
 
-const SignIn: NextPage = (props: PropsWithChildren<Props>) => {
+const ForgotPassword: NextPage = (props: PropsWithChildren<Props>) => {
   const auth = useAuth();
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [isAuthFailed, setAuthFailed] = useState(false);
 
-  const executeSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
+  const forgotPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const result = await auth.signIn(username, password);
+    const result = await auth.forgotPassword(username);
     if (result.success) {
-      await Router.push('/');
+      await Router.push('/password/forgot-submit');
     } else {
       setAuthFailed(true);
     }
@@ -52,9 +48,9 @@ const SignIn: NextPage = (props: PropsWithChildren<Props>) => {
             <LockOutlinedIcon />
           </Avatar>
           <Typography component='h1' variant='h5'>
-            Sign in
+            Hi, Please change your password.
           </Typography>
-          <Box component='form' onSubmit={executeSignIn} noValidate sx={{ mt: 1 }}>
+          <Box component='form' onSubmit={forgotPassword} noValidate sx={{ mt: 1 }}>
             <TextField
               margin='normal'
               required
@@ -67,30 +63,10 @@ const SignIn: NextPage = (props: PropsWithChildren<Props>) => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
-            <TextField
-              margin='normal'
-              required
-              fullWidth
-              name='password'
-              label='Password'
-              type='password'
-              id='password'
-              autoComplete='current-password'
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            <FormControlLabel control={<Checkbox value='remember' color='primary' />} label='Remember me' />
             <Button type='submit' fullWidth variant='outlined' sx={{ mt: 3, mb: 2 }}>
-              Sign In
+              Change password
             </Button>
-            <Grid container>
-              <Grid item xs>
-                <Link href='/password/forgot' variant='body2'>
-                  Forgot password?
-                </Link>
-              </Grid>
-            </Grid>
-            <Grid container>{isAuthFailed ? <Alert severity='error'>Authentication failed...</Alert> : <></>}</Grid>
+            <Grid container>{isAuthFailed ? <Alert severity='error'>Failed to reset password...</Alert> : <></>}</Grid>
           </Box>
         </Box>
       </Container>
@@ -100,4 +76,4 @@ const SignIn: NextPage = (props: PropsWithChildren<Props>) => {
 
 type Props = {};
 
-export default SignIn;
+export default ForgotPassword;

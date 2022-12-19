@@ -4,9 +4,9 @@ const nextConfig = {
   swcMinify: true,
   serverRuntimeConfig: {},
   publicRuntimeConfig: {
-    region: process.env.AUTH_REGION,
-    userPoolId: process.env.AUTH_USER_POOL_ID,
-    userPoolWebClientId: process.env.AUTH_USER_POOL_WEB_CLIENT_ID,
+    region: process.env.AWS_COGNITO_AUTH_REGION,
+    userPoolId: process.env.AWS_COGNITO_AUTH_USER_POOL_ID,
+    userPoolWebClientId: process.env.AWS_COGNITO_AUTH_USER_POOL_WEB_CLIENT_ID,
   },
 };
 

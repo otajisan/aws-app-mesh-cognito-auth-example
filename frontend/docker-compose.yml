@@ -1,0 +1,20 @@
+version: '3'
+services:
+  frontend:
+    build:
+      context: .
+    working_dir: /frontend
+    ports:
+      - '3000:3000'
+    tty: true
+    stdin_open: true
+    env_file:
+      - .env.development
+    environment:
+      # Cognito Auth
+      - AWS_COGNITO_AUTH_REGION=${AWS_COGNITO_AUTH_REGION:-default}
+      - AWS_COGNITO_AUTH_USER_POOL_ID=${AWS_COGNITO_AUTH_USER_POOL_ID:-default}
+      - AWS_COGNITO_AUTH_USER_POOL_WEB_CLIENT_ID=${AWS_COGNITO_AUTH_USER_POOL_WEB_CLIENT_ID:-default}
+      # Hot reload
+      - CHOKIDAR_USEPOLLING=true
+    command: npm run dev

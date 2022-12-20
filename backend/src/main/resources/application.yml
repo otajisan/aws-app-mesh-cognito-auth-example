@@ -1,0 +1,53 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: backend
+    title: aws-app-mesh-cognito-auth-example-backend
+    version: 0.0.1-SNAPSHOT
+  mvc:
+    throw-exception-if-no-handler-found: true
+  resources:
+    add-mappings: false
+  devtools:
+    add-properties: false
+
+server:
+  port: 9080
+
+management:
+  server:
+    port: 39080
+  endpoint:
+    prometheus:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include:
+          - health
+          - prometheus
+          - info
+          - metric
+
+aws:
+  credentials:
+    accessKey:
+    secretKey:
+    instance-profile: false
+  region:
+    static: ap-northeast-1
+  stack:
+    auto: false
+  instance:
+    data:
+      enabled: false
+
+logging:
+  level:
+    com:
+      amazonaws:
+        util:
+          EC2MetadataUtils: ERROR
+        internal:
+          InstanceMetadataServiceResourceFetcher: ERROR

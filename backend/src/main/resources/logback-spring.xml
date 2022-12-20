@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- property definitions -->
+    <property name="TIME_ZONE" value="Asia/Tokyo"/>
+    <property name="TIMESTAMP_PATTERN" value="yyyy-MM-dd'T'HH:mm:ss.SSS"/>
+    <property name="SEPARATOR" value="UNIX"/>
+
+    <!-- Basic Console Appender -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>DEBUG</level>
+        </filter>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- JSON Console Appender -->
+    <appender name="STDOUT_JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <!-- apply pretty JSON if local env -->
+            <springProfile name="local">
+                <jsonGeneratorDecorator class="net.logstash.logback.decorate.PrettyPrintingJsonGeneratorDecorator"/>
+            </springProfile>
+            <timeZone>${TIME_ZONE}</timeZone>
+            <timestampPattern>${TIMESTAMP_PATTERN}</timestampPattern>
+            <customFields>{"app": "backend"}</customFields>
+            <lineSeparator>${SEPARATOR}</lineSeparator>
+        </encoder>
+    </appender>
+
+    <!-- root loglevel and apply appender -->
+    <root level="INFO">
+        <springProfile name="local">
+            <appender-ref ref="STDOUT"/>
+        </springProfile>
+        <springProfile name="!local">
+            <appender-ref ref="STDOUT_JSON"/>
+        </springProfile>
+    </root>
+</configuration>

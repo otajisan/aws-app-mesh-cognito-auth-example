@@ -1,8 +1,6 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    //id("org.springframework.boot") version "3.0.0"
-    //id("org.springframework.boot") version "3.0.0-RC2"
     id("org.springframework.boot") version "3.0.0-RC2"
     id("io.spring.dependency-management") version "1.1.0"
     kotlin("jvm") version "1.7.21"
@@ -42,7 +40,7 @@ jib {
         creationTime = "USE_CURRENT_TIMESTAMP"
         jvmFlags = listOf(
             "-Xms512m",
-            "-Xmx2048m",
+            "-Xmx512m",
             "-Duser.language=ja",
             "-Duser.timezone=Asia/Tokyo",
             "-Dspring.devtools.restart.enabled=false",
@@ -60,7 +58,7 @@ jib {
 }
 
 // NOTE: https://github.com/aws/aws-xray-sdk-java/issues/364
-val tomcatVersion = "9.0.70"
+//val tomcatVersion = "9.0.70"
 val awsXRayVersion = "2.13.0"
 
 dependencies {
@@ -109,7 +107,7 @@ dependencies {
     testImplementation("org.mockito:mockito-inline:4.8.0")
 
     // Dev Tool
-    //developmentOnly("org.springframework.boot:spring-boot-devtools")
+    developmentOnly("org.springframework.boot:spring-boot-devtools")
 }
 
 // https://spring.pleiades.io/spring-boot/docs/current/gradle-plugin/reference/htmlsingle/#packaging-executable.configuring.main-class

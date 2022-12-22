@@ -27,6 +27,6 @@ export class AppMeshStack extends Stack {
       });
     });
 
-    Tags.of(this).add('ServiceName', 'gp');
+    Tags.of(this).add('ServiceName', 'morningcode');
   }
 }

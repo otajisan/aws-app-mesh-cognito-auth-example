@@ -19,13 +19,13 @@ import { ApplicationLoadBalancedFargateService } from 'aws-cdk-lib/aws-ecs-patte
 import { DnsRecordType, Service } from 'aws-cdk-lib/aws-servicediscovery';
 import { CloudMapNamespaceStack, CloudMapNamespaceStackProps } from './cloud-map-namespace-stack';
 
-export interface FrontEndStackProps extends StackProps {
+export interface BackEndStackProps extends StackProps {
     vpcName: string,
     cloudMapNamespaceStack: CloudMapNamespaceStack
 }
 
-export class FrontEndStack extends Stack {
-  constructor(scope: Construct, id: string, props: FrontEndStackProps) {
+export class BackEndStack extends Stack {
+  constructor(scope: Construct, id: string, props: BackEndStackProps) {
     super(scope, id, props);
 
     // Vpc
@@ -34,7 +34,7 @@ export class FrontEndStack extends Stack {
     });
 
     // Application Names
-    const appName = 'mtaji-test-app-mesh-fe';
+    const appName = 'mtaji-test-app-mesh-be';
 
     // ECR
     const repository = new Repository(this, `Repository-${appName}`, {
@@ -84,8 +84,13 @@ export class FrontEndStack extends Stack {
       },
     });
     containerDefinition.addPortMappings({
-      hostPort: 3000,
-      containerPort: 3000,
+      hostPort: 9080,
+      containerPort: 9080,
+      protocol: Protocol.TCP,
+    });
+    containerDefinition.addPortMappings({
+      hostPort: 39080,
+      containerPort: 39080,
       protocol: Protocol.TCP,
     });
 
@@ -113,39 +118,32 @@ export class FrontEndStack extends Stack {
       vpc,
     });
 
-    ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(3000), 'allow access to simple frontend service');
+    ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(9080), 'allow access to Backend API');
+    ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(39080), 'allow health check to Backend API');
 
     // ECS - Fargate with ALB
-    // const certificateArn = StringParameter.valueFromLookup(this, 'ACM_FRONTEND_CERTIFICATE_ARN');
-    const fargateService = new ApplicationLoadBalancedFargateService(this, 'ECSService', {
+    const fargateService = new FargateService(this, 'ECSService', {
       cluster: escCluster,
       serviceName: appName,
-      loadBalancerName: `${appName}-alb`,
       desiredCount: 1,
       taskDefinition,
       securityGroups: [ecsSecurityGroup],
-      publicLoadBalancer: true,
-      // redirectHTTP: true,
-      // sslPolicy: SslPolicy.RECOMMENDED,
-      // certificate: Certificate.fromCertificateArn(this, 'Cert', certificateArn),
-    });
-
-    fargateService.targetGroup.configureHealthCheck({
-      path: '/api/healthz',
     });
 
     // Cloud Map
     const { namespace } = props.cloudMapNamespaceStack;
 
     const cloudMapService = new Service(this, 'Service', {
-      name: 'fe',
+      name: 'be',
       namespace,
       dnsRecordType: DnsRecordType.A_AAAA,
       dnsTtl: Duration.seconds(30),
       loadBalancer: true,
     });
 
-    cloudMapService.registerLoadBalancer('LB', fargateService.loadBalancer);
+    fargateService.associateCloudMapService({
+      service: cloudMapService,
+    });
 
     Tags.of(this).add('ServiceName', 'morningcode');
   }

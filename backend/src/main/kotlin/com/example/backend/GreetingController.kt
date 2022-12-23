@@ -4,6 +4,7 @@ import com.amazonaws.xray.spring.aop.XRayEnabled
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @XRayEnabled
@@ -20,7 +21,8 @@ class GreetingController {
     @ApiResponse(responseCode = "200", description = "Success")
     @ResponseStatus(HttpStatus.OK)
     @GetMapping(value = ["/to/{name}"])
-    fun to(@PathVariable name: String): String = "Hello $name!"
+    fun to(@PathVariable name: String): ResponseEntity<GreetingMessageOutput> =
+        ResponseEntity.ok(GreetingMessageOutput("Hello $name!"))
 
     /**
      * Ping

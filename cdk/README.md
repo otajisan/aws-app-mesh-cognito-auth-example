@@ -1,14 +1,18 @@
-# Welcome to your CDK TypeScript project
+# AWS App Mesh Example
 
-This is a blank project for CDK development with TypeScript.
+## Deployment
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+```bash
+npx cdk diff --profile=xxx "*Stack"
+npx cdk deploy --profile=xxx "*Stack"
+```
 
-## Useful commands
+## Tests
 
-* `npm run build`   compile typescript to js
-* `npm run watch`   watch for changes and compile
-* `npm run test`    perform the jest unit tests
-* `cdk deploy`      deploy this stack to your default AWS account/region
-* `cdk diff`        compare deployed stack with current state
-* `cdk synth`       emits the synthesized CloudFormation template
+```bash
+npm run test
+```
+
+## Refs
+- https://dev.to/jaecktec/aws-app-mesh-in-5-steps-1bmc
+- https://github.com/nathanpeck/greeter-app-mesh-cdk/blob/master/index.js

@@ -5,23 +5,22 @@ import {
 import { Construct } from 'constructs';
 import { Repository } from 'aws-cdk-lib/aws-ecr';
 import {
-  IVpc, Peer, Port, SecurityGroup, Vpc,
+  Peer, Port, SecurityGroup, Vpc,
 } from 'aws-cdk-lib/aws-ec2';
 import {
-  AwsLogDriver, Cluster, ContainerImage, EcrImage, FargateService, FargateTaskDefinition, Protocol,
+  AwsLogDriver, Cluster, ContainerImage, EcrImage, FargateTaskDefinition, Protocol,
 } from 'aws-cdk-lib/aws-ecs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { ManagedPolicy } from 'aws-cdk-lib/aws-iam';
-import { StringParameter } from 'aws-cdk-lib/aws-ssm';
-import { Certificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { SslPolicy } from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import { ApplicationLoadBalancedFargateService } from 'aws-cdk-lib/aws-ecs-patterns';
 import { DnsRecordType, Service } from 'aws-cdk-lib/aws-servicediscovery';
-import { CloudMapNamespaceStack, CloudMapNamespaceStackProps } from './cloud-map-namespace-stack';
+import { CloudMapNamespaceStack } from './cloud-map-namespace-stack';
+import { AppMeshStack } from './app-mesh-stack';
 
 export interface FrontEndStackProps extends StackProps {
     vpcName: string,
-    cloudMapNamespaceStack: CloudMapNamespaceStack
+    cloudMapNamespaceStack: CloudMapNamespaceStack,
+    appMeshStack: AppMeshStack
 }
 
 export class FrontEndStack extends Stack {

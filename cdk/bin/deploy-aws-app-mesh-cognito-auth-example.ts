@@ -15,8 +15,8 @@ const vpcName = process.env.VPC_NAME!;
 
 const app = new cdk.App();
 const cloudMapNamespaceStack = new CloudMapNamespaceStack(app, 'CloudMapNamespaceStack', { env, vpcName });
+const appMeshStack = new AppMeshStack(app, 'AppMeshStack', { env });
 new FrontEndStack(app, 'FrontEndStack', { env, vpcName, cloudMapNamespaceStack });
 new BackEndStack(app, 'BackEndStack', { env, vpcName, cloudMapNamespaceStack });
-new AppMeshStack(app, 'AppMeshStack', { env, vpcName });
 
 app.synth();

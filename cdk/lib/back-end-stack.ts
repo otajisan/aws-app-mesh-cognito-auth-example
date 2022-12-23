@@ -5,23 +5,37 @@ import {
 import { Construct } from 'constructs';
 import { Repository } from 'aws-cdk-lib/aws-ecr';
 import {
-  IVpc, Peer, Port, SecurityGroup, Vpc,
+  Peer, Port, SecurityGroup, Vpc,
 } from 'aws-cdk-lib/aws-ec2';
 import {
-  AwsLogDriver, Cluster, ContainerImage, EcrImage, FargateService, FargateTaskDefinition, Protocol,
+  AppMeshProxyConfiguration,
+  AwsLogDriver,
+  Cluster,
+  ContainerImage,
+  EcrImage,
+  FargateService,
+  FargateTaskDefinition,
+  Protocol,
 } from 'aws-cdk-lib/aws-ecs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { ManagedPolicy } from 'aws-cdk-lib/aws-iam';
-import { StringParameter } from 'aws-cdk-lib/aws-ssm';
-import { Certificate } from 'aws-cdk-lib/aws-certificatemanager';
-import { SslPolicy } from 'aws-cdk-lib/aws-elasticloadbalancingv2';
-import { ApplicationLoadBalancedFargateService } from 'aws-cdk-lib/aws-ecs-patterns';
 import { DnsRecordType, Service } from 'aws-cdk-lib/aws-servicediscovery';
-import { CloudMapNamespaceStack, CloudMapNamespaceStackProps } from './cloud-map-namespace-stack';
+import {
+  HealthCheck, RouteSpec,
+  ServiceDiscovery,
+  VirtualNode,
+  VirtualNodeListener,
+  VirtualRouter,
+  VirtualRouterListener,
+  VirtualService, VirtualServiceProvider,
+} from 'aws-cdk-lib/aws-appmesh';
+import { CloudMapNamespaceStack } from './cloud-map-namespace-stack';
+import { AppMeshStack } from './app-mesh-stack';
 
 export interface BackEndStackProps extends StackProps {
     vpcName: string,
-    cloudMapNamespaceStack: CloudMapNamespaceStack
+    cloudMapNamespaceStack: CloudMapNamespaceStack,
+    appMeshStack: AppMeshStack
 }
 
 export class BackEndStack extends Stack {
@@ -60,6 +74,16 @@ export class BackEndStack extends Stack {
       family: appName,
       memoryLimitMiB: 1024,
       cpu: 256,
+      proxyConfiguration: new AppMeshProxyConfiguration({
+        containerName: 'envoy',
+        properties: {
+          appPorts: [80],
+          proxyEgressPort: 15001,
+          proxyIngressPort: 15000,
+          ignoredUID: 1337,
+          egressIgnoredIPs: ['169.254.170.2', '169.254.169.254'],
+        },
+      }),
     });
 
     // Log configuration
@@ -74,7 +98,7 @@ export class BackEndStack extends Stack {
 
     // Application Container
     const containerImage = EcrImage.fromEcrRepository(repository, 'latest');
-    const containerDefinition = taskDefinition.addContainer('Container', {
+    const appContainer = {
       image: containerImage,
       memoryLimitMiB: 768,
       logging: awsLogDriver,
@@ -82,7 +106,8 @@ export class BackEndStack extends Stack {
         DEPLOY_HASH: process.env.GIT_SHA1 as string,
         GENERATE_SOURCEMAP: 'false',
       },
-    });
+    };
+    const containerDefinition = taskDefinition.addContainer('Container', appContainer);
     containerDefinition.addPortMappings({
       hostPort: 9080,
       containerPort: 9080,
@@ -94,11 +119,46 @@ export class BackEndStack extends Stack {
       protocol: Protocol.TCP,
     });
 
+    // Envoy Sidecar
+    const { mesh } = props.appMeshStack;
+    const envoyContainer = taskDefinition.addContainer('EnvoyContainer', {
+      containerName: 'envoy',
+      // https://docs.aws.amazon.com/ja_jp/app-mesh/latest/userguide/envoy.html
+      image: ContainerImage.fromRegistry('public.ecr.aws/appmesh/aws-appmesh-envoy:v1.24.0.0-prod'),
+      essential: true,
+      environment: {
+        ENVOY_LOG_LEVEL: 'info',
+        APPMESH_VIRTUAL_NODE_NAME: `mesh/${mesh.meshName}/virtualNode/${appName}`,
+        AWS_REGION: Stack.of(this).region,
+      },
+      healthCheck: {
+        command: [
+          'CMD-SHELL',
+          'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE',
+        ],
+        startPeriod: Duration.seconds(10),
+        interval: Duration.seconds(5),
+        timeout: Duration.seconds(2),
+        retries: 3,
+      },
+      memoryLimitMiB: 128,
+      user: '1337',
+      logging: new AwsLogDriver({
+        streamPrefix: `${appName}-envoy`,
+      }),
+    });
+    envoyContainer.taskDefinition.taskRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName('AWSAppMeshEnvoyAccess'),
+    );
+    containerDefinition.addContainerDependencies({
+      container: envoyContainer,
+    });
+
     // XRay
     // https://docs.aws.amazon.com/ja_jp/xray/latest/devguide/xray-daemon-ecs.html
     const xrayContainer = taskDefinition.addContainer('XRayContainer', {
       containerName: 'xray-daemon',
-      image: ContainerImage.fromRegistry('amazon/aws-xray-daemon:3.x'),
+      image: ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.x'),
       cpu: 32,
       memoryLimitMiB: 256,
       memoryReservationMiB: 256,
@@ -143,6 +203,46 @@ export class BackEndStack extends Stack {
 
     fargateService.associateCloudMapService({
       service: cloudMapService,
+    });
+
+    // App Mesh
+    const virtualNode = new VirtualNode(this, 'VirtualNode', {
+      mesh,
+      virtualNodeName: appName,
+      serviceDiscovery: ServiceDiscovery.cloudMap(cloudMapService),
+      listeners: [
+        VirtualNodeListener.tcp({
+          port: 9080,
+          healthCheck: HealthCheck.tcp({
+            healthyThreshold: 2,
+            interval: Duration.seconds(5),
+            timeout: Duration.seconds(2),
+            unhealthyThreshold: 2,
+          }),
+        }),
+
+      ],
+    });
+
+    const virtualRouter = new VirtualRouter(this, 'VirtualRouter', {
+      mesh,
+      virtualRouterName: `${appName}-router`,
+      listeners: [VirtualRouterListener.http(9080)],
+    });
+
+    virtualRouter.addRoute('Route', {
+      routeName: `${appName}-route`,
+      routeSpec: RouteSpec.http({
+        weightedTargets: [{
+          virtualNode,
+          weight: 1,
+        }],
+      }),
+    });
+
+    const virtualService = new VirtualService(this, 'VirtualService', {
+      virtualServiceProvider: VirtualServiceProvider.virtualRouter(virtualRouter),
+      virtualServiceName: `be.${props.cloudMapNamespaceStack.namespace.namespaceName}`,
     });
 
     Tags.of(this).add('ServiceName', 'morningcode');

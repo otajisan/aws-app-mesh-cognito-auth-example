@@ -1,6 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
-import { FrontEndStack } from '../lib/front-end-stack';
 import { CloudMapNamespaceStack } from '../lib/cloud-map-namespace-stack';
 import { BackEndStack } from '../lib/back-end-stack';
 

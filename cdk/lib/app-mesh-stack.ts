@@ -1,33 +1,17 @@
-import {
-  RemovalPolicy, Stack, StackProps, Tags,
-} from 'aws-cdk-lib';
+import { Stack, StackProps, Tags } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
-import { Repository } from 'aws-cdk-lib/aws-ecr';
-import { IVpc, Vpc } from 'aws-cdk-lib/aws-ec2';
-import {
-  AwsLogDriver, Cluster, FargateService, FargateTaskDefinition,
-} from 'aws-cdk-lib/aws-ecs';
-
-export interface AppMeshStackProps extends StackProps {
-    vpcName: string,
-}
+import { IMesh, Mesh } from 'aws-cdk-lib/aws-appmesh';
 
 export class AppMeshStack extends Stack {
-  constructor(scope: Construct, id: string, props: AppMeshStackProps) {
+  public readonly mesh: IMesh;
+
+  constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    // Vpc
-    const vpc = Vpc.fromLookup(this, 'Vpc', {
-      vpcName: props.vpcName,
+    // Service Mesh
+    this.mesh = new Mesh(this, 'Mesh', {
+      meshName: 'morningcode-app-mesh',
     });
-
-    // Application Names
-    const appNameFe = 'mtaji-test-aws-app-mesh-frontend';
-    const appNameBe = 'mtaji-test-aws-app-mesh-backend';
-    const appNames = [
-      appNameFe,
-      appNameBe,
-    ];
 
     Tags.of(this).add('ServiceName', 'morningcode');
   }

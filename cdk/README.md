@@ -7,6 +7,10 @@ npx cdk diff --profile=xxx "*Stack"
 npx cdk deploy --profile=xxx "*Stack"
 ```
 
+```bash
+npx cdk diff --profile morning-code-dev EcrStack
+```
+
 ## Tests
 
 ```bash

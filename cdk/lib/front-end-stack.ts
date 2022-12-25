@@ -36,16 +36,7 @@ export class FrontEndStack extends Stack {
     const appName = 'mtaji-test-app-mesh-fe';
 
     // ECR
-    const repository = new Repository(this, `Repository-${appName}`, {
-      repositoryName: appName,
-      imageScanOnPush: true,
-      removalPolicy: RemovalPolicy.DESTROY,
-      lifecycleRules: [
-        {
-          maxImageCount: 1,
-        },
-      ],
-    });
+    const repository = Repository.fromRepositoryName(this, 'EcrRepository', appName);
 
     // ECS Cluster
     const escCluster = new Cluster(this, `EcsCluster-${appName}`, {

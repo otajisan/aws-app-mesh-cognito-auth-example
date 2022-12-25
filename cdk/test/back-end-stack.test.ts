@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Template } from 'aws-cdk-lib/assertions';
 import { CloudMapNamespaceStack } from '../lib/cloud-map-namespace-stack';
 import { BackEndStack } from '../lib/back-end-stack';
+import { AppMeshStack } from '../lib/app-mesh-stack';
 
 describe('correct resources are created', () => {
   const synthStack = () => {
@@ -18,17 +19,11 @@ describe('correct resources are created', () => {
         env,
         vpcName,
       }),
+      appMeshStack: new AppMeshStack(app, 'AppMeshStack', {
+        env,
+      }),
     });
   };
-
-  test('ECR repository is created', () => {
-    const template = Template.fromStack(synthStack());
-
-    const expected = 'mtaji-test-app-mesh-be';
-    template.hasResourceProperties('AWS::ECR::Repository', {
-      RepositoryName: expected,
-    });
-  });
 
   test('ECS Cluster is created', () => {
     const template = Template.fromStack(synthStack());

@@ -32,7 +32,7 @@ jib {
 
     to {
         image =
-            System.getenv("AWS_ACCOUNT_ID") + ".dkr.ecr." + System.getenv("AWS_REGION") + ".amazonaws.com/backend"
+            System.getenv("AWS_ACCOUNT_ID") + ".dkr.ecr." + System.getenv("AWS_REGION") + ".amazonaws.com/mtaji-test-app-mesh-be"
         tags = setOf("$version.${extra["buildNumber"]}")
     }
 

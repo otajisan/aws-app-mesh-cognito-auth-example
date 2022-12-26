@@ -254,6 +254,7 @@ jobs:
           path: ~/test-results
 
       - codecov/upload
+          file:  ~/test-results/jacoco/jacocoTestReport.xml
 
       - setup_remote_docker
 
@@ -322,6 +323,7 @@ jobs:
           path: ~/test-results
 
       - codecov/upload
+          file:  ~/test-results/jacoco/jacocoTestReport.xml
 
       - run:
           name: Move test results

@@ -234,6 +234,9 @@ jobs:
           name: Run gradle test
           command: cd << parameters.sub-project-name >> && ./gradlew test
 
+      - codecov/upload
+          file: '<< parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml'
+
       - run:
           name: Move coverage report
           command: |
@@ -252,9 +255,6 @@ jobs:
 
       - store_test_results:
           path: ~/test-results
-
-      - codecov/upload
-          file: '~/test-results/jacoco/jacocoTestReport.xml'
 
       - setup_remote_docker
 
@@ -312,6 +312,9 @@ jobs:
           name: Run gradle test
           command: cd << parameters.sub-project-name >> && ./gradlew test
 
+      - codecov/upload
+          file: '<< parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml'
+
       - run:
           name: Move coverage report
           command: |
@@ -321,9 +324,6 @@ jobs:
 
       - store_artifacts:
           path: ~/test-results
-
-      - codecov/upload
-          file: '~/test-results/jacoco/jacocoTestReport.xml'
 
       - run:
           name: Move test results

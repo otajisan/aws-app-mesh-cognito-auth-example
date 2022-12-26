@@ -422,8 +422,8 @@ workflows:
               only: main
 
     # AWS CDK
-    build-mtaji-test-app-mesh-cdk:
-      when: << pipeline.parameters.build-mtaji-test-app-mesh-cdk >>
-      jobs:
-        - build-and-test-cdk:
-            sub-project-name: cdk
+  build-mtaji-test-app-mesh-cdk:
+    when: << pipeline.parameters.build-mtaji-test-app-mesh-cdk >>
+    jobs:
+      - build-and-test-cdk:
+          sub-project-name: cdk

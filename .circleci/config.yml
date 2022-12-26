@@ -14,5 +14,5 @@ workflows:
           base-revision: origin/main
           config-path: .circleci/publish.yml
           mapping: |
-            frontend/.* mtaji-test-app-mesh-fe true
-            backend/.* mtaji-test-app-mesh-be true
+            frontend/.* build-mtaji-test-app-mesh-fe true
+            backend/.* build-mtaji-test-app-mesh-be true

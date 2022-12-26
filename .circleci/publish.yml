@@ -378,13 +378,13 @@ workflows:
     when: << pipeline.parameters.build-mtaji-test-app-mesh-be >>
     jobs:
       - build-and-test-gradle-project:
-          sub-project-name: mtaji-test-app-mesh-be
+          sub-project-name: backend
           filters:
             branches:
               ignore: main
 
       - build-and-publish-gradle-project:
-          sub-project-name: mtaji-test-app-mesh-be
+          sub-project-name: backend
           filters:
             branches:
               only: main

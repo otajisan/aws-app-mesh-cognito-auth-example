@@ -33,9 +33,9 @@ import { CloudMapNamespaceStack } from './cloud-map-namespace-stack';
 import { AppMeshStack } from './app-mesh-stack';
 
 export interface BackEndStackProps extends StackProps {
-    vpcName: string,
-    cloudMapNamespaceStack: CloudMapNamespaceStack,
-    appMeshStack: AppMeshStack
+  vpcName: string,
+  cloudMapNamespaceStack: CloudMapNamespaceStack,
+  appMeshStack: AppMeshStack
 }
 
 export class BackEndStack extends Stack {
@@ -90,6 +90,7 @@ export class BackEndStack extends Stack {
     // Application Container
     const containerImage = EcrImage.fromEcrRepository(repository, 'latest');
     const appContainer = {
+      containerName: appName,
       image: containerImage,
       memoryLimitMiB: 768,
       logging: awsLogDriver,
@@ -127,10 +128,10 @@ export class BackEndStack extends Stack {
           'CMD-SHELL',
           'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE',
         ],
-        startPeriod: Duration.seconds(10),
+        startPeriod: Duration.seconds(30),
         interval: Duration.seconds(5),
         timeout: Duration.seconds(2),
-        retries: 3,
+        retries: 5,
       },
       memoryLimitMiB: 128,
       user: '1337',
@@ -138,6 +139,13 @@ export class BackEndStack extends Stack {
         streamPrefix: `${appName}-envoy`,
       }),
     });
+    // healthcheck endpoint
+    envoyContainer.addPortMappings({
+      hostPort: 9901,
+      containerPort: 9901,
+      protocol: Protocol.TCP,
+    });
+
     envoyContainer.taskDefinition.taskRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName('AWSAppMeshEnvoyAccess'),
     );
@@ -147,20 +155,20 @@ export class BackEndStack extends Stack {
 
     // XRay
     // https://docs.aws.amazon.com/ja_jp/xray/latest/devguide/xray-daemon-ecs.html
-    const xrayContainer = taskDefinition.addContainer('XRayContainer', {
-      containerName: 'xray-daemon',
-      image: ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.x'),
-      cpu: 32,
-      memoryLimitMiB: 256,
-      memoryReservationMiB: 256,
-      portMappings: [
-        { containerPort: 2000, protocol: Protocol.UDP },
-      ],
-    });
-
-    xrayContainer.taskDefinition.taskRole.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
-    );
+    // const xrayContainer = taskDefinition.addContainer('XRayContainer', {
+    //   containerName: 'xray-daemon',
+    //   image: ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.x'),
+    //   cpu: 32,
+    //   memoryLimitMiB: 256,
+    //   memoryReservationMiB: 256,
+    //   portMappings: [
+    //     { containerPort: 2000, protocol: Protocol.UDP },
+    //   ],
+    // });
+    //
+    // xrayContainer.taskDefinition.taskRole.addManagedPolicy(
+    //   ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+    // );
 
     // Security Group
     const ecsSecurityGroup = new SecurityGroup(this, 'EcsSg', {
@@ -180,6 +188,7 @@ export class BackEndStack extends Stack {
       taskDefinition,
       securityGroups: [ecsSecurityGroup],
     });
+    // fargateService.connections.allowFrom();
 
     // Cloud Map
     const { namespace } = props.cloudMapNamespaceStack;
@@ -203,8 +212,9 @@ export class BackEndStack extends Stack {
       serviceDiscovery: ServiceDiscovery.cloudMap(cloudMapService),
       listeners: [
         VirtualNodeListener.tcp({
-          port: 9080,
-          healthCheck: HealthCheck.tcp({
+          port: 39080,
+          healthCheck: HealthCheck.http({
+            path: '/actuator/health',
             healthyThreshold: 2,
             interval: Duration.seconds(5),
             timeout: Duration.seconds(2),

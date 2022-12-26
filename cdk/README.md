@@ -9,6 +9,10 @@ npx cdk deploy --profile=xxx "*Stack"
 
 ```bash
 npx cdk diff --profile morning-code-dev EcrStack
+npx cdk diff --profile morning-code-dev CloudMapNamespaceStack
+npx cdk diff --profile morning-code-dev AppMeshStack
+npx cdk diff --profile morning-code-dev BackEndStack
+npx cdk diff --profile morning-code-dev FrontEndStack
 ```
 
 ## Tests

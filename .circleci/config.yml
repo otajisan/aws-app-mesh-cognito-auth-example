@@ -16,3 +16,4 @@ workflows:
           mapping: |
             frontend/.* build-mtaji-test-app-mesh-fe true
             backend/.* build-mtaji-test-app-mesh-be true
+            cdk/.* build-mtaji-test-app-mesh-cdk true

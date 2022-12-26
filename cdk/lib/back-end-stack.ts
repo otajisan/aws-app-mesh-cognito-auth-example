@@ -90,6 +90,7 @@ export class BackEndStack extends Stack {
     // Application Container
     const containerImage = EcrImage.fromEcrRepository(repository, 'latest');
     const appContainer = {
+      containerName: appName,
       image: containerImage,
       memoryLimitMiB: 768,
       logging: awsLogDriver,
@@ -127,10 +128,10 @@ export class BackEndStack extends Stack {
           'CMD-SHELL',
           'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE',
         ],
-        startPeriod: Duration.seconds(10),
+        startPeriod: Duration.seconds(30),
         interval: Duration.seconds(5),
         timeout: Duration.seconds(2),
-        retries: 3,
+        retries: 5,
       },
       memoryLimitMiB: 128,
       user: '1337',
@@ -144,6 +145,7 @@ export class BackEndStack extends Stack {
       containerPort: 9901,
       protocol: Protocol.TCP,
     });
+
     envoyContainer.taskDefinition.taskRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName('AWSAppMeshEnvoyAccess'),
     );
@@ -186,6 +188,7 @@ export class BackEndStack extends Stack {
       taskDefinition,
       securityGroups: [ecsSecurityGroup],
     });
+    // fargateService.connections.allowFrom();
 
     // Cloud Map
     const { namespace } = props.cloudMapNamespaceStack;
@@ -209,8 +212,9 @@ export class BackEndStack extends Stack {
       serviceDiscovery: ServiceDiscovery.cloudMap(cloudMapService),
       listeners: [
         VirtualNodeListener.tcp({
-          port: 9080,
-          healthCheck: HealthCheck.tcp({
+          port: 39080,
+          healthCheck: HealthCheck.http({
+            path: '/actuator/health',
             healthyThreshold: 2,
             interval: Duration.seconds(5),
             timeout: Duration.seconds(2),

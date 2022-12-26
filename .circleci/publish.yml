@@ -1,0 +1,385 @@
+version: 2.1
+
+orbs:
+  docker: circleci/docker@2.0.1
+  aws-ecr: circleci/aws-ecr@7.3.0
+  slack: circleci/slack@4.9.3
+
+parameters:
+  # Build flags
+  build-mtaji-test-app-mesh-fe:
+    type: boolean
+    default: false
+  build-mtaji-test-app-mesh-be:
+    type: boolean
+    default: false
+
+commands:
+  # Slack notification commands
+  slack-notify-pass:
+    parameters:
+      sub-project-name:
+        type: string
+        default: ''
+
+    steps:
+      - slack/notify:
+          event: pass
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":circleci_pass: CircleCI Build Succeeded: $CIRCLE_PROJECT_REPONAME/<< parameters.sub-project-name >>\nGo it! :sushi:",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Job*: $CIRCLE_JOB"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Build number*: << pipeline.number >>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author*: $CIRCLE_USERNAME"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch*: <https://github.com/otajisan/aws-app-mesh-cognito-auth-example/tree/$CIRCLE_BRANCH|$CIRCLE_BRANCH>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*PR*: $CIRCLE_PULL_REQUEST"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit*: <https://github.com/otajisan/aws-app-mesh-cognito-auth-example/commit/<< pipeline.git.revision >>|<< pipeline.git.revision >>>"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": ":circleci: View Job",
+                        "emoji": true
+                      },
+                      "url": "$CIRCLE_BUILD_URL"
+                    }
+                  ]
+                }
+              ]
+            }
+
+  slack-notify-fail:
+    parameters:
+      sub-project-name:
+        type: string
+        default: ''
+
+    steps:
+      - slack/notify:
+          event: fail
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":circleci_fail: CircleCI Build Failed: $CIRCLE_PROJECT_REPONAME/<< parameters.sub-project-name >>\nplease check :pray:",
+                    "emoji": true
+                  }
+                },
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Job*: $CIRCLE_JOB"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Build number*: << pipeline.number >>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Author*: $CIRCLE_USERNAME"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Branch*: <https://github.com/otajisan/aws-app-mesh-cognito-auth-example/tree/$CIRCLE_BRANCH|$CIRCLE_BRANCH>"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*PR*: $CIRCLE_PULL_REQUEST"
+                    },
+                    {
+                      "type": "mrkdwn",
+                      "text": "*Commit*: <https://github.com/otajisan/aws-app-mesh-cognito-auth-example/commit/<< pipeline.git.revision >>|<< pipeline.git.revision >>>"
+                    }
+                  ]
+                },
+                {
+                  "type": "actions",
+                  "elements": [
+                    {
+                      "type": "button",
+                      "text": {
+                        "type": "plain_text",
+                        "text": ":circleci: View Job",
+                        "emoji": true
+                      },
+                      "url": "$CIRCLE_BUILD_URL"
+                    }
+                  ]
+                }
+              ]
+            }
+
+jobs:
+  meaningless-job:
+    docker:
+      - image: alpine:latest
+    steps:
+      - run:
+          name: no diff found
+          command: |
+            echo 'no diff found'
+
+  # Build Frontend Service
+  build-and-publish-frontend:
+    machine:
+      # https://circleci.com/docs/ja/configuration-reference#available-linux-machine-images
+      image: ubuntu-2204:2022.07.1
+    steps:
+      - aws-ecr/build-and-push-image:
+          account-url: AWS_ECR_ACCOUNT_URL_BASE
+          aws-access-key-id: AWS_ACCESS_KEY_ID
+          aws-secret-access-key: AWS_SECRET_ACCESS_KEY
+          path: mtaji-test-app-mesh-fe
+          dockerfile: Dockerfile
+          create-repo: false
+          repo: mtaji-test-app-mesh-fe
+          region: AWS_DEFAULT_REGION
+          skip-when-tags-exist: false
+          # TODO:
+          tag: 'latest,${CIRCLE_SHA1},v0.0.1'
+          extra-build-args: |
+            --build-arg AWS_COGNITO_AUTH_REGION=AWS_COGNITO_AUTH_REGION \
+            --build-arg AWS_COGNITO_AUTH_USER_POOL_ID=AWS_COGNITO_AUTH_USER_POOL_ID \
+            --build-arg AWS_COGNITO_AUTH_USER_POOL_WEB_CLIENT_ID=AWS_COGNITO_AUTH_USER_POOL_WEB_CLIENT_ID \
+
+      - slack-notify-pass:
+          sub-project-name: mtaji-test-app-mesh-fe
+      - slack-notify-fail:
+          sub-project-name: mtaji-test-app-mesh-fe
+
+  # Test gradle project
+  build-and-test-gradle-project:
+    parameters:
+      sub-project-name:
+        type: string
+        default: ''
+
+    docker:
+      - image: circleci/openjdk:17-jdk-buster
+
+    working_directory: ~/repo
+
+    environment:
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "<< parameters.sub-project-name >>/build.gradle.kts" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run:
+          name: Set environment variables for build
+          command: |
+            echo 'export SPRING_PROFILES_ACTIVE=ci' >> $BASH_ENV
+            source $BASH_ENV
+
+      - run:
+          name: Echo deploy hash
+          command: echo ${CIRCLE_SHA1}
+
+      - run: cd << parameters.sub-project-name >> && ./gradlew dependencies
+
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: v1-dependencies-{{ checksum "<< parameters.sub-project-name >>/build.gradle.kts" }}
+
+      - run:
+          name: Run gradle test
+          command: cd << parameters.sub-project-name >> && ./gradlew test
+
+      - run:
+          name: Move coverage report
+          command: |
+            mkdir -p ~/test-results/jacoco/
+            mv << parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml ~/test-results/jacoco/
+            mv << parameters.sub-project-name >>/build/jacocoHtml ~/test-results/jacoco/
+
+      - store_artifacts:
+          path: ~/test-results
+
+      - run:
+          name: Move test results
+          command: |
+            mkdir -p ~/test-results/junit/
+            mv << parameters.sub-project-name >>/build/test-results/test/*.xml ~/test-results/junit/
+
+      - store_test_results:
+          path: ~/test-results
+
+      - setup_remote_docker
+
+      - run:
+          name: Build Docker Image by jibDockerBuild
+          command: cd << parameters.sub-project-name >> && ./gradlew jibDockerBuild
+
+      - slack-notify-fail:
+          sub-project-name: << parameters.sub-project-name >>
+
+  # Publish Gradle project docker image
+  build-and-publish-gradle-project:
+    parameters:
+      sub-project-name:
+        type: string
+        default: ''
+
+    docker:
+      - image: circleci/openjdk:17-jdk-buster
+
+    working_directory: ~/repo
+
+    environment:
+      # Customize the JVM maximum heap limit
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "<< parameters.sub-project-name >>/build.gradle.kts" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run:
+          name: Set environment variables for build
+          command: |
+            echo 'export SPRING_PROFILES_ACTIVE=ci' >> $BASH_ENV
+            source $BASH_ENV
+
+      - run:
+          name: Echo deploy hash
+          command: echo ${CIRCLE_SHA1}
+
+      - run: cd << parameters.sub-project-name >> && ./gradlew dependencies
+
+      - save_cache:
+          paths:
+            - ~/.gradle
+          key: v1-dependencies-{{ checksum "<< parameters.sub-project-name >>/build.gradle.kts" }}
+
+      - run:
+          name: Run gradle test
+          command: cd << parameters.sub-project-name >> && ./gradlew test
+
+      - run:
+          name: Move coverage report
+          command: |
+            mkdir -p ~/test-results/jacoco/
+            mv << parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml ~/test-results/jacoco/
+            mv << parameters.sub-project-name >>/build/jacocoHtml ~/test-results/jacoco/
+
+      - store_artifacts:
+          path: ~/test-results
+
+      - run:
+          name: Move test results
+          command: |
+            mkdir -p ~/test-results/junit/
+            mv << parameters.sub-project-name >>/build/test-results/test/*.xml ~/test-results/junit/
+
+      - store_test_results:
+          path: ~/test-results
+
+      - setup_remote_docker
+
+      - run:
+          name: Install amazon-ecr-credential-helper
+          command: sudo apt update -y && sudo apt install amazon-ecr-credential-helper -y
+
+      - run:
+          name: Build Docker Image by Jib
+          command: cd << parameters.sub-project-name >> && ./gradlew jibDockerBuild
+
+      - run:
+          name: Publish image to AWS ECR
+          command: cd << parameters.sub-project-name >> && ./gradlew jib -Djib.to.tags=latest,${CIRCLE_SHA1},v0.0.1
+
+      - slack-notify-pass:
+          sub-project-name: << parameters.sub-project-name >>
+      - slack-notify-fail:
+          sub-project-name: << parameters.sub-project-name >>
+
+
+workflows:
+  version: 2.1
+
+  meaningless-job:
+    jobs:
+      - meaningless-job
+    when:
+      and:
+      - not: << pipeline.parameters.build-mtaji-test-app-mesh-fe >>
+      - not: << pipeline.parameters.build-mtaji-test-app-mesh-be >>
+
+  # Frontend Service
+  build-mtaji-test-app-mesh-fe:
+    when: << pipeline.parameters.mtaji-test-app-mesh-fe >>
+    jobs:
+      - build-and-publish-frontend:
+          filters:
+            branches:
+              only:
+                - main
+
+  # Backend Service
+  build-mtaji-test-app-mesh-be:
+    when: << pipeline.parameters.build-mtaji-test-app-mesh-be >>
+    jobs:
+      - build-and-test-gradle-project:
+          sub-project-name: mtaji-test-app-mesh-be
+          filters:
+            branches:
+              ignore: main
+
+      - build-and-publish-gradle-project:
+          sub-project-name: mtaji-test-app-mesh-be
+          filters:
+            branches:
+              only: main

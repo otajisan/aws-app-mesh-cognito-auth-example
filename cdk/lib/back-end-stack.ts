@@ -33,9 +33,9 @@ import { CloudMapNamespaceStack } from './cloud-map-namespace-stack';
 import { AppMeshStack } from './app-mesh-stack';
 
 export interface BackEndStackProps extends StackProps {
-    vpcName: string,
-    cloudMapNamespaceStack: CloudMapNamespaceStack,
-    appMeshStack: AppMeshStack
+  vpcName: string,
+  cloudMapNamespaceStack: CloudMapNamespaceStack,
+  appMeshStack: AppMeshStack
 }
 
 export class BackEndStack extends Stack {
@@ -137,6 +137,12 @@ export class BackEndStack extends Stack {
       logging: new AwsLogDriver({
         streamPrefix: `${appName}-envoy`,
       }),
+    });
+    // healthcheck endpoint
+    envoyContainer.addPortMappings({
+      hostPort: 9901,
+      containerPort: 9901,
+      protocol: Protocol.TCP,
     });
     envoyContainer.taskDefinition.taskRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName('AWSAppMeshEnvoyAccess'),

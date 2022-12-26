@@ -393,6 +393,7 @@ workflows:
       and:
       - not: << pipeline.parameters.build-mtaji-test-app-mesh-fe >>
       - not: << pipeline.parameters.build-mtaji-test-app-mesh-be >>
+      - not: << pipeline.parameters.build-mtaji-test-app-mesh-cdk >>
 
   # Frontend Service
   build-mtaji-test-app-mesh-fe:
@@ -426,6 +427,3 @@ workflows:
       jobs:
         - build-and-test-cdk:
             sub-project-name: cdk
-            filters:
-              branches:
-                ignore: main

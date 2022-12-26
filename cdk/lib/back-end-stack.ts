@@ -147,20 +147,20 @@ export class BackEndStack extends Stack {
 
     // XRay
     // https://docs.aws.amazon.com/ja_jp/xray/latest/devguide/xray-daemon-ecs.html
-    const xrayContainer = taskDefinition.addContainer('XRayContainer', {
-      containerName: 'xray-daemon',
-      image: ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.x'),
-      cpu: 32,
-      memoryLimitMiB: 256,
-      memoryReservationMiB: 256,
-      portMappings: [
-        { containerPort: 2000, protocol: Protocol.UDP },
-      ],
-    });
-
-    xrayContainer.taskDefinition.taskRole.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
-    );
+    // const xrayContainer = taskDefinition.addContainer('XRayContainer', {
+    //   containerName: 'xray-daemon',
+    //   image: ContainerImage.fromRegistry('public.ecr.aws/xray/aws-xray-daemon:3.x'),
+    //   cpu: 32,
+    //   memoryLimitMiB: 256,
+    //   memoryReservationMiB: 256,
+    //   portMappings: [
+    //     { containerPort: 2000, protocol: Protocol.UDP },
+    //   ],
+    // });
+    //
+    // xrayContainer.taskDefinition.taskRole.addManagedPolicy(
+    //   ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+    // );
 
     // Security Group
     const ecsSecurityGroup = new SecurityGroup(this, 'EcsSg', {

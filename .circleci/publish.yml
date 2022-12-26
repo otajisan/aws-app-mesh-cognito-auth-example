@@ -14,6 +14,9 @@ parameters:
   build-mtaji-test-app-mesh-be:
     type: boolean
     default: false
+  build-mtaji-test-app-mesh-cdk:
+    type: boolean
+    default: false
 
 commands:
   # Slack notification commands
@@ -353,6 +356,32 @@ jobs:
       - slack-notify-fail:
           sub-project-name: << parameters.sub-project-name >>
 
+  build-and-test-cdk:
+    parameters:
+      sub-project-name:
+        type: string
+        default: ''
+    executor:
+      name: node/default
+    steps:
+      - checkout
+      - run: sudo npm install -g npm@latest
+      - node/install-packages:
+          app-dir: << parameters.sub-project-name >>
+          pkg-manager: npm
+          with-cache: true
+          cache-only-lockfile: true
+      - run:
+          name: Run npm test
+          command: npm run test
+
+      - codecov/upload:
+          file: << parameters.sub-project-name >>/coverage/lcov.info
+
+      - slack-notify-pass:
+          sub-project-name: << parameters.sub-project-name >>
+      - slack-notify-fail:
+          sub-project-name: << parameters.sub-project-name >>
 
 workflows:
   version: 2.1
@@ -390,3 +419,13 @@ workflows:
           filters:
             branches:
               only: main
+
+    # AWS CDK
+    build-mtaji-test-app-mesh-cdk:
+      when: << pipeline.parameters.build-mtaji-test-app-mesh-cdk >>
+      jobs:
+        - build-and-test-cdk:
+            sub-project-name: cdk
+            filters:
+              branches:
+                ignore: main

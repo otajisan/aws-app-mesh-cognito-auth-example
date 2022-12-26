@@ -18,10 +18,10 @@ const app = new cdk.App();
 new EcrStack(app, 'EcrStack');
 const cloudMapNamespaceStack = new CloudMapNamespaceStack(app, 'CloudMapNamespaceStack', { env, vpcName });
 const appMeshStack = new AppMeshStack(app, 'AppMeshStack', { env });
-new FrontEndStack(app, 'FrontEndStack', {
+new BackEndStack(app, 'BackEndStack', {
   env, vpcName, cloudMapNamespaceStack, appMeshStack,
 });
-new BackEndStack(app, 'BackEndStack', {
+new FrontEndStack(app, 'FrontEndStack', {
   env, vpcName, cloudMapNamespaceStack, appMeshStack,
 });
 

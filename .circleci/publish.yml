@@ -360,7 +360,7 @@ workflows:
 
   # Frontend Service
   build-mtaji-test-app-mesh-fe:
-    when: << pipeline.parameters.mtaji-test-app-mesh-fe >>
+    when: << pipeline.parameters.build-mtaji-test-app-mesh-fe >>
     jobs:
       - build-and-publish-frontend:
           filters:

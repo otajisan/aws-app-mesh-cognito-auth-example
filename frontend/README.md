@@ -25,3 +25,9 @@ direnv allow .
 ```bash
 npm run dev
 ```
+
+- or, run by docker compose
+
+```bash
+docker compose up
+```

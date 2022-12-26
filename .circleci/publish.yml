@@ -169,7 +169,7 @@ jobs:
           account-url: AWS_ECR_ACCOUNT_URL_BASE
           aws-access-key-id: AWS_ACCESS_KEY_ID
           aws-secret-access-key: AWS_SECRET_ACCESS_KEY
-          path: mtaji-test-app-mesh-fe
+          path: frontend
           dockerfile: Dockerfile
           create-repo: false
           repo: mtaji-test-app-mesh-fe

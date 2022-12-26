@@ -19,7 +19,7 @@ internal class GreetingControllerTests {
     fun `respond greeting message`() {
         mockMvc.perform(get("/greeting/to/mtaji"))
             .andExpect(status().isOk)
-            .andExpect(content().string("Hello mtaji!"))
+            .andExpect(content().json("{\"message\":\"Hello mtaji!\"}"))
     }
 
     @Test

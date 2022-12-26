@@ -234,6 +234,9 @@ jobs:
           name: Run gradle test
           command: cd << parameters.sub-project-name >> && ./gradlew test
 
+      - codecov/upload:
+          file: '<< parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml'
+
       - run:
           name: Move coverage report
           command: |
@@ -252,8 +255,6 @@ jobs:
 
       - store_test_results:
           path: ~/test-results
-
-      - codecov/upload
 
       - setup_remote_docker
 
@@ -311,6 +312,9 @@ jobs:
           name: Run gradle test
           command: cd << parameters.sub-project-name >> && ./gradlew test
 
+      - codecov/upload:
+          file: '<< parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml'
+
       - run:
           name: Move coverage report
           command: |
@@ -320,8 +324,6 @@ jobs:
 
       - store_artifacts:
           path: ~/test-results
-
-      - codecov/upload
 
       - run:
           name: Move test results
@@ -378,13 +380,13 @@ workflows:
     when: << pipeline.parameters.build-mtaji-test-app-mesh-be >>
     jobs:
       - build-and-test-gradle-project:
-          sub-project-name: mtaji-test-app-mesh-be
+          sub-project-name: backend
           filters:
             branches:
               ignore: main
 
       - build-and-publish-gradle-project:
-          sub-project-name: mtaji-test-app-mesh-be
+          sub-project-name: backend
           filters:
             branches:
               only: main

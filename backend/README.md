@@ -1,4 +1,6 @@
-# Getting Started
+# Backend Example
+
+## Getting Started
 
 ```bash
 # Download Open Telemetry Java Agent

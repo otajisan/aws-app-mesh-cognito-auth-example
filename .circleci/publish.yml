@@ -235,7 +235,7 @@ jobs:
           command: cd << parameters.sub-project-name >> && ./gradlew test
 
       - codecov/upload
-          file: '<< parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml'
+          file: << parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml
 
       - run:
           name: Move coverage report
@@ -313,7 +313,7 @@ jobs:
           command: cd << parameters.sub-project-name >> && ./gradlew test
 
       - codecov/upload
-          file: '<< parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml'
+          file: << parameters.sub-project-name >>/build/reports/jacoco/test/jacocoTestReport.xml
 
       - run:
           name: Move coverage report

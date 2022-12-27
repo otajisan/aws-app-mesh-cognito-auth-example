@@ -15,13 +15,14 @@ import {
   EcrImage,
   FargateService,
   FargateTaskDefinition,
-  Protocol,
+  Protocol, UlimitName,
 } from 'aws-cdk-lib/aws-ecs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { ManagedPolicy } from 'aws-cdk-lib/aws-iam';
 import { DnsRecordType, Service } from 'aws-cdk-lib/aws-servicediscovery';
 import {
-  HealthCheck, RouteSpec,
+  AccessLog,
+  HealthCheck, IVirtualService, RouteSpec,
   ServiceDiscovery,
   VirtualNode,
   VirtualNodeListener,
@@ -39,6 +40,8 @@ export interface BackEndStackProps extends StackProps {
 }
 
 export class BackEndStack extends Stack {
+  public readonly virtualService: IVirtualService;
+
   constructor(scope: Construct, id: string, props: BackEndStackProps) {
     super(scope, id, props);
 
@@ -54,7 +57,7 @@ export class BackEndStack extends Stack {
     const repository = Repository.fromRepositoryName(this, 'EcrRepository', appName);
 
     // ECS Cluster
-    const escCluster = new Cluster(this, `EcsCluster-${appName}`, {
+    const ecsCluster = new Cluster(this, `EcsCluster-${appName}`, {
       clusterName: appName,
       vpc,
       containerInsights: true,
@@ -68,7 +71,7 @@ export class BackEndStack extends Stack {
       proxyConfiguration: new AppMeshProxyConfiguration({
         containerName: 'envoy',
         properties: {
-          appPorts: [80],
+          appPorts: [9080],
           proxyEgressPort: 15001,
           proxyIngressPort: 15000,
           ignoredUID: 1337,
@@ -145,6 +148,7 @@ export class BackEndStack extends Stack {
       containerPort: 9901,
       protocol: Protocol.TCP,
     });
+    envoyContainer.addUlimits({ name: UlimitName.NOFILE, hardLimit: 15000, softLimit: 15000 });
 
     envoyContainer.taskDefinition.taskRole.addManagedPolicy(
       ManagedPolicy.fromAwsManagedPolicyName('AWSAppMeshEnvoyAccess'),
@@ -180,9 +184,9 @@ export class BackEndStack extends Stack {
     ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(9080), 'allow access to Backend API');
     ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(39080), 'allow health check to Backend API');
 
-    // ECS - Fargate with ALB
+    // ECS - Fargate
     const fargateService = new FargateService(this, 'ECSService', {
-      cluster: escCluster,
+      cluster: ecsCluster,
       serviceName: appName,
       desiredCount: 1,
       taskDefinition,
@@ -201,27 +205,29 @@ export class BackEndStack extends Stack {
       loadBalancer: true,
     });
 
-    fargateService.associateCloudMapService({
-      service: cloudMapService,
-    });
+    // fargateService.associateCloudMapService({
+    //   service: cloudMapService,
+    // });
 
     // App Mesh
     const virtualNode = new VirtualNode(this, 'VirtualNode', {
       mesh,
       virtualNodeName: appName,
       serviceDiscovery: ServiceDiscovery.cloudMap(cloudMapService),
+      accessLog: AccessLog.fromFilePath('/dev/stdout'),
       listeners: [
         VirtualNodeListener.tcp({
           port: 39080,
           healthCheck: HealthCheck.http({
-            path: '/actuator/health',
+            // NOTE: https://dev.to/jaecktec/aws-app-mesh-in-5-steps-1bmc
+            // no forward slash??
+            path: 'actuator/health',
             healthyThreshold: 2,
             interval: Duration.seconds(5),
             timeout: Duration.seconds(2),
             unhealthyThreshold: 2,
           }),
         }),
-
       ],
     });
 
@@ -241,7 +247,7 @@ export class BackEndStack extends Stack {
       }),
     });
 
-    const virtualService = new VirtualService(this, 'VirtualService', {
+    this.virtualService = new VirtualService(this, 'VirtualService', {
       virtualServiceProvider: VirtualServiceProvider.virtualRouter(virtualRouter),
       virtualServiceName: `be.${props.cloudMapNamespaceStack.namespace.namespaceName}`,
     });

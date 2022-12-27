@@ -6,6 +6,7 @@ import { FrontEndStack } from '../lib/front-end-stack';
 import { CloudMapNamespaceStack } from '../lib/cloud-map-namespace-stack';
 import { BackEndStack } from '../lib/back-end-stack';
 import { EcrStack } from '../lib/ecr-stack';
+import { IngressGatewayServiceStack } from '../lib/ingress-gateway-service-stack';
 
 const env = {
   account: process.env.CDK_DEPLOY_ACCOUNT,
@@ -18,11 +19,13 @@ const app = new cdk.App();
 new EcrStack(app, 'EcrStack');
 const cloudMapNamespaceStack = new CloudMapNamespaceStack(app, 'CloudMapNamespaceStack', { env, vpcName });
 const appMeshStack = new AppMeshStack(app, 'AppMeshStack', { env });
-new BackEndStack(app, 'BackEndStack', {
+
+const ingressGatewayServiceStack = new IngressGatewayServiceStack(app, 'IngressGatewayServiceStack', { env, vpcName, appMeshStack });
+const backEndStack = new BackEndStack(app, 'BackEndStack', {
   env, vpcName, cloudMapNamespaceStack, appMeshStack,
 });
 new FrontEndStack(app, 'FrontEndStack', {
-  env, vpcName, cloudMapNamespaceStack, appMeshStack,
+  env, vpcName, cloudMapNamespaceStack, appMeshStack, backEndStack,
 });
 
 app.synth();

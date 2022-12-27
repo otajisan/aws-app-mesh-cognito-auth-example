@@ -8,19 +8,32 @@ import {
   Peer, Port, SecurityGroup, Vpc,
 } from 'aws-cdk-lib/aws-ec2';
 import {
-  AwsLogDriver, Cluster, ContainerImage, EcrImage, FargateTaskDefinition, Protocol,
+  AppMeshProxyConfiguration,
+  AwsLogDriver, Cluster, ContainerImage, EcrImage, FargateTaskDefinition, Protocol, UlimitName,
 } from 'aws-cdk-lib/aws-ecs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import { ManagedPolicy } from 'aws-cdk-lib/aws-iam';
 import { ApplicationLoadBalancedFargateService } from 'aws-cdk-lib/aws-ecs-patterns';
 import { DnsRecordType, Service } from 'aws-cdk-lib/aws-servicediscovery';
+import {
+  AccessLog, Backend,
+  HealthCheck,
+  RouteSpec,
+  ServiceDiscovery,
+  VirtualNode,
+  VirtualNodeListener,
+  VirtualRouter,
+  VirtualRouterListener, VirtualService, VirtualServiceProvider,
+} from 'aws-cdk-lib/aws-appmesh';
 import { CloudMapNamespaceStack } from './cloud-map-namespace-stack';
 import { AppMeshStack } from './app-mesh-stack';
+import { BackEndStack } from './back-end-stack';
 
 export interface FrontEndStackProps extends StackProps {
-    vpcName: string,
-    cloudMapNamespaceStack: CloudMapNamespaceStack,
-    appMeshStack: AppMeshStack
+  vpcName: string,
+  cloudMapNamespaceStack: CloudMapNamespaceStack,
+  appMeshStack: AppMeshStack,
+  backEndStack: BackEndStack
 }
 
 export class FrontEndStack extends Stack {
@@ -39,7 +52,7 @@ export class FrontEndStack extends Stack {
     const repository = Repository.fromRepositoryName(this, 'EcrRepository', appName);
 
     // ECS Cluster
-    const escCluster = new Cluster(this, `EcsCluster-${appName}`, {
+    const ecsCluster = new Cluster(this, `EcsCluster-${appName}`, {
       clusterName: appName,
       vpc,
       containerInsights: true,
@@ -50,6 +63,16 @@ export class FrontEndStack extends Stack {
       family: appName,
       memoryLimitMiB: 1024,
       cpu: 256,
+      proxyConfiguration: new AppMeshProxyConfiguration({
+        containerName: 'envoy',
+        properties: {
+          appPorts: [9080],
+          proxyEgressPort: 15001,
+          proxyIngressPort: 15000,
+          ignoredUID: 1337,
+          egressIgnoredIPs: ['169.254.170.2', '169.254.169.254'],
+        },
+      }),
     });
 
     // Log configuration
@@ -79,22 +102,65 @@ export class FrontEndStack extends Stack {
       protocol: Protocol.TCP,
     });
 
-    // XRay
-    // https://docs.aws.amazon.com/ja_jp/xray/latest/devguide/xray-daemon-ecs.html
-    const xrayContainer = taskDefinition.addContainer('XRayContainer', {
-      containerName: 'xray-daemon',
-      image: ContainerImage.fromRegistry('amazon/aws-xray-daemon:3.x'),
-      cpu: 32,
-      memoryLimitMiB: 256,
-      memoryReservationMiB: 256,
-      portMappings: [
-        { containerPort: 2000, protocol: Protocol.UDP },
-      ],
+    // Envoy Sidecar
+    const { mesh } = props.appMeshStack;
+    const envoyContainer = taskDefinition.addContainer('EnvoyContainer', {
+      containerName: 'envoy',
+      // https://docs.aws.amazon.com/ja_jp/app-mesh/latest/userguide/envoy.html
+      image: ContainerImage.fromRegistry('public.ecr.aws/appmesh/aws-appmesh-envoy:v1.24.0.0-prod'),
+      essential: true,
+      environment: {
+        ENVOY_LOG_LEVEL: 'info',
+        APPMESH_VIRTUAL_NODE_NAME: `mesh/${mesh.meshName}/virtualNode/${appName}`,
+        AWS_REGION: Stack.of(this).region,
+      },
+      healthCheck: {
+        command: [
+          'CMD-SHELL',
+          'curl -s http://localhost:9901/server_info | grep state | grep -q LIVE',
+        ],
+        startPeriod: Duration.seconds(30),
+        interval: Duration.seconds(5),
+        timeout: Duration.seconds(2),
+        retries: 5,
+      },
+      memoryLimitMiB: 128,
+      user: '1337',
+      logging: new AwsLogDriver({
+        streamPrefix: `${appName}-envoy`,
+      }),
+    });
+    // healthcheck endpoint
+    envoyContainer.addPortMappings({
+      hostPort: 9901,
+      containerPort: 9901,
+      protocol: Protocol.TCP,
+    });
+    envoyContainer.addUlimits({ name: UlimitName.NOFILE, hardLimit: 15000, softLimit: 15000 });
+
+    envoyContainer.taskDefinition.taskRole.addManagedPolicy(
+      ManagedPolicy.fromAwsManagedPolicyName('AWSAppMeshEnvoyAccess'),
+    );
+    containerDefinition.addContainerDependencies({
+      container: envoyContainer,
     });
 
-    xrayContainer.taskDefinition.taskRole.addManagedPolicy(
-      ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
-    );
+    // XRay
+    // https://docs.aws.amazon.com/ja_jp/xray/latest/devguide/xray-daemon-ecs.html
+    // const xrayContainer = taskDefinition.addContainer('XRayContainer', {
+    //   containerName: 'xray-daemon',
+    //   image: ContainerImage.fromRegistry('amazon/aws-xray-daemon:3.x'),
+    //   cpu: 32,
+    //   memoryLimitMiB: 256,
+    //   memoryReservationMiB: 256,
+    //   portMappings: [
+    //     { containerPort: 2000, protocol: Protocol.UDP },
+    //   ],
+    // });
+    //
+    // xrayContainer.taskDefinition.taskRole.addManagedPolicy(
+    //   ManagedPolicy.fromAwsManagedPolicyName('AWSXRayDaemonWriteAccess'),
+    // );
 
     // Security Group
     const ecsSecurityGroup = new SecurityGroup(this, 'EcsSg', {
@@ -108,7 +174,7 @@ export class FrontEndStack extends Stack {
     // ECS - Fargate with ALB
     // const certificateArn = StringParameter.valueFromLookup(this, 'ACM_FRONTEND_CERTIFICATE_ARN');
     const fargateService = new ApplicationLoadBalancedFargateService(this, 'ECSService', {
-      cluster: escCluster,
+      cluster: ecsCluster,
       serviceName: appName,
       loadBalancerName: `${appName}-alb`,
       desiredCount: 1,
@@ -135,7 +201,53 @@ export class FrontEndStack extends Stack {
       loadBalancer: true,
     });
 
-    cloudMapService.registerLoadBalancer('LB', fargateService.loadBalancer);
+    // cloudMapService.registerLoadBalancer('LB', fargateService.loadBalancer);
+
+    // App Mesh
+    const virtualNode = new VirtualNode(this, 'VirtualNode', {
+      mesh,
+      virtualNodeName: appName,
+      serviceDiscovery: ServiceDiscovery.cloudMap(cloudMapService),
+      accessLog: AccessLog.fromFilePath('/dev/stdout'),
+      listeners: [
+        VirtualNodeListener.tcp({
+          port: 3000,
+          healthCheck: HealthCheck.http({
+            // NOTE: https://dev.to/jaecktec/aws-app-mesh-in-5-steps-1bmc
+            // no forward slash??
+            path: 'api/healthz',
+            healthyThreshold: 2,
+            interval: Duration.seconds(5),
+            timeout: Duration.seconds(2),
+            unhealthyThreshold: 2,
+          }),
+        }),
+      ],
+    });
+
+    const virtualRouter = new VirtualRouter(this, 'VirtualRouter', {
+      mesh,
+      virtualRouterName: `${appName}-router`,
+      listeners: [VirtualRouterListener.http(3000)],
+    });
+
+    virtualRouter.addRoute('Route', {
+      routeName: `${appName}-route`,
+      routeSpec: RouteSpec.http({
+        weightedTargets: [{
+          virtualNode,
+          weight: 1,
+        }],
+      }),
+    });
+
+    const virtualService = new VirtualService(this, 'VirtualService', {
+      virtualServiceProvider: VirtualServiceProvider.virtualRouter(virtualRouter),
+      virtualServiceName: `fe.${props.cloudMapNamespaceStack.namespace.namespaceName}`,
+    });
+
+    const backEndVService = props.backEndStack.virtualService;
+    virtualNode.addBackend(Backend.virtualService(backEndVService));
 
     Tags.of(this).add('ServiceName', 'morningcode');
   }
